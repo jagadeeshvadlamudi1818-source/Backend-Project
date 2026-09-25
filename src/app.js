@@ -1,25 +1,40 @@
 import "dotenv/config";
-import express from "express"
-import cors from "cors"
-import cookieparser from "cookieparser"
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import multer from "multer";
+import userRouter from "./routes/user.route.js";
 
-const app = express()
+const app = express();
 
-app.use(cors({
-    origin: process.env.CROS_ORIGIN,
-    credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || true,
+    credentials: true,
+  })
+);
 
-app.use(express.json({limit : "16kb"}))
-app.use(express.urlencoded({extended:true, limit:"16kb"}))
+app.use(express.json({ limit: "16kb" }));
+app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
-app.use(express.static("public"))
-app.use(cookieparser())
+app.use(express.static("public"));
+app.use(cookieParser());
 
-import userRouter from `./routes/user.route.js`
+app.use("/api/v1/users", userRouter);
 
-app.use("/api/v1/users",userRouter)
+app.use((error, req, res, next) => {
+  if (res.headersSent) {
+    return next(error);
+  }
 
-//http://localhost:18000/api/v1/users/register
+  const statusCode =
+    error instanceof multer.MulterError ? 400 : error.statusCode || 500;
 
-export {app}
+  return res.status(statusCode).json({
+    success: false,
+    message: error.message || "Internal server error",
+    errors: error.errors || [],
+  });
+});
+
+export { app };
