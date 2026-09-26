@@ -4,6 +4,38 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
+
+const generateAccessAndRefreshTokens = async (userId) => {
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            throw new ApiError(404, "User not found");
+        }
+
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+
+        user.refreshToken = refreshToken;
+
+        await user.save({
+            validateBeforeSave: false
+        });
+
+        return {
+            accessToken,
+            refreshToken
+        };
+
+    } catch (error) {
+        throw new ApiError(
+            500,
+            "Something went wrong while generating refresh and access token"
+        );
+    }
+};
+
+
 const registerUser = asyncHandler(async (req, res) => {
   const { fullName, email, username, password } = req.body;
 
@@ -25,8 +57,15 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with email or username already exists");
   }
 
-  // Get uploaded files
-  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+    // Check if fields are empty
+    if ([fullName, email, username, password]
+            .some((field) => field?.trim() === "")
+    ) {
+        throw new ApiError(
+            400,
+            "All fields are required"
+        );
+    }
 
   const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
@@ -40,6 +79,15 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // Upload cover image
   let coverImage = null;
+
+    if (existedUser) {
+        throw new ApiError(
+            409,
+            "User with email or username already exists"
+        );
+    }
+   console.log(req.files);
+ 
 
   if (coverImageLocalPath) {
     coverImage = await uploadOnCloudinary(coverImageLocalPath);
